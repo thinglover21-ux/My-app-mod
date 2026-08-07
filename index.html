@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول – Pollinations</title>
+<style>
+  :root {
+    --bg: #14201a;
+    --panel: #1c2b23;
+    --gold: #d9b25f;
+    --gold-soft: #f0d99a;
+    --green-soft: #8fae95;
+    --text: #eef2ee;
+    --muted: #9fb3a6;
+    --danger: #e88a82;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 20% 15%, #22352a 0%, var(--bg) 55%);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    color: var(--text);
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid rgba(217,178,95,0.25);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  }
+  .bloom {
+    width: 56px; height: 56px;
+    margin-bottom: 18px;
+    border-radius: 50%;
+    background: conic-gradient(from 90deg, var(--gold), var(--green-soft), var(--gold-soft), var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: .2px; }
+  p.sub { color: var(--muted); margin: 0 0 26px; font-size: 14px; line-height: 1.7; }
+  button {
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .15s ease, opacity .15s ease;
+    font-family: inherit;
+  }
+  button:active { transform: scale(0.98); }
+  button:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 2px; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+    color: #22301f;
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--text);
+  }
+  .btn-secondary:hover { border-color: var(--gold); }
+  .status {
+    margin-top: 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    display: none;
+  }
+  .status.show { display: block; }
+  .status.error { color: var(--danger); background: rgba(224,115,106,0.1); }
+  .key-badge {
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    background: rgba(0,0,0,0.25);
+    padding: 10px 12px;
+    border-radius: 8px;
+    word-break: break-all;
+    color: var(--gold-soft);
+    margin-bottom: 16px;
+    direction: ltr;
+    text-align: left;
+  }
+  .row { display: flex; gap: 10px; }
+  .row button { flex: 1; }
+  .hidden { display: none !important; }
+  .balance { margin-top: 14px; font-size: 14px; direction: ltr; text-align: left; }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="bloom">🌼</div>
+
+    <!-- حالة: غير مسجّل دخول -->
+    <div id="loggedOutView">
+      <h1>تسجيل الدخول عبر Pollinations</h1>
+      <p class="sub">
+        اضغط الزر أدناه لتسجيل الدخول بحساب Pollinations الخاص بك.
+        سيُصدر لك النظام مفتاحًا خاصًا (sk_...) يستهلك رصيد Pollen الخاص بك أنت، وليس رصيد المطوّر.
+      </p>
+      <button class="btn-primary" id="loginBtn">تسجيل الدخول عبر Pollinations</button>
+    </div>
+
+    <!-- حالة: تم تسجيل الدخول -->
+    <div id="loggedInView" class="hidden">
+      <h1>تم تسجيل الدخول ✅</h1>
+      <p class="sub">تم إصدار مفتاح خاص بك وتخزينه في متصفحك فقط (localStorage).</p>
+      <div class="key-badge" id="keyBadge"></div>
+      <div class="row">
+        <button class="btn-secondary" id="balanceBtn">تحقق من الرصيد</button>
+        <button class="btn-secondary" id="logoutBtn">تسجيل الخروج</button>
+      </div>
+      <div class="balance" id="balanceResult"></div>
+    </div>
+
+    <div id="statusBox" class="status" role="status" aria-live="polite"></div>
+  </div>
+
+<script>
+/* =========================================================
+   ⚙️ إعدادات يجب ضبطها قبل النشر
+   ========================================================= */
+
+// ضع هنا App Key العام الذي أنشأته على enter.pollinations.ai (يبدأ بـ pk_...).
+// هذا المفتاح نفسه هو الـ client_id — نظام Pollinations لا يصدر "Client ID" منفصلاً
+// ولا نوع اعتماد اسمه "OAuth App" مستقلاً عن هذا؛ الـ pk_ + عناوين إعادة التوجيه
+// (redirect URIs) المسجّلة عليه هي كل ما يجعله "تطبيق OAuth" من جهة Pollinations.
+const CLIENT_ID = "pk_1DDTh2bgEZQHuRVx";
+
+// نقطة التفويض الرسمية لتدفّق Bring Your Own Pollen (BYOP)
+const AUTH_ENDPOINT = "https://enter.pollinations.ai/authorize";
+
+// الصلاحية المطلوبة. اتركها "" إن كنت لا تحتاج قراءة اسم المستخدم/صورته.
+const SCOPE = "profile";
+
+// عنوان الرجوع بعد الموافقة — احرص أن يطابق حرفيًا أحد عناوين redirect URIs
+// التي سجّلتها على مفتاح pk_ في لوحة enter.pollinations.ai.
+// بالنسبة لموقعك، يجب تسجيل بالضبط:
+//https://thinglover21-ux.github.io/My-app-mod/
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+/* ========================================================= */
+
+const $ = (id) => document.getElementById(id);
+
+function showStatus(msg, isError = false) {
+  const box = $("statusBox");
+  box.textContent = msg;
+  box.className = "status show" + (isError ? " error" : "");
+}
+
+function randomState() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function startLogin() {
+  if (!CLIENT_ID || CLIENT_ID.includes("ضع_مفتاحك")) {
+    showStatus("رجاءً ضع App Key (pk_...) الخاص بك في متغيّر CLIENT_ID أولاً.", true);
+    return;
+  }
+  const state = randomState();
+  sessionStorage.setItem("pollinations_oauth_state", state);
+
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    state,
+  });
+  if (SCOPE) params.set("scope", SCOPE);
+
+  window.location.href = `${AUTH_ENDPOINT}?${params.toString()}`;
+}
+
+function logout() {
+  localStorage.removeItem("pollinations_api_key");
+  $("balanceResult").textContent = "";
+  render();
+}
+
+async function checkBalance() {
+  const key = localStorage.getItem("pollinations_api_key");
+  $("balanceResult").textContent = "جارِ التحقق...";
+  try {
+    const res = await fetch("https://gen.pollinations.ai/account/balance", {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    $("balanceResult").textContent = JSON.stringify(data);
+  } catch (err) {
+    $("balanceResult").textContent = "تعذّر جلب الرصيد: " + err.message;
+  }
+}
+
+function handleRedirectCallback() {
+  if (!window.location.hash) return;
+  const frag = new URLSearchParams(window.location.hash.slice(1));
+
+  const error = frag.get("error");
+  if (error) {
+    showStatus("فشل تسجيل الدخول: " + (frag.get("error_description") || error), true);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    return;
+  }
+
+  const apiKey = frag.get("api_key");
+  if (!apiKey) return;
+
+  const returnedState = frag.get("state");
+  const savedState = sessionStorage.getItem("pollinations_oauth_state");
+  if (!returnedState || returnedState !== savedState) {
+    showStatus("تعذّر التحقق من الطلب (state غير مطابق). أعد المحاولة من فضلك.", true);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    return;
+  }
+
+  localStorage.setItem("pollinations_api_key", apiKey);
+  sessionStorage.removeItem("pollinations_oauth_state");
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  showStatus("تم تسجيل الدخول بنجاح.");
+}
+
+function render() {
+  const key = localStorage.getItem("pollinations_api_key");
+  if (key) {
+    $("loggedOutView").classList.add("hidden");
+    $("loggedInView").classList.remove("hidden");
+    $("keyBadge").textContent = key.slice(0, 10) + "…" + key.slice(-4);
+  } else {
+    $("loggedInView").classList.add("hidden");
+    $("loggedOutView").classList.remove("hidden");
+  }
+}
+
+$("loginBtn").addEventListener("click", startLogin);
+$("logoutBtn").addEventListener("click", logout);
+$("balanceBtn").addEventListener("click", checkBalance);
+
+handleRedirectCallback();
+render();
+</script>
+</body>
+</html>
