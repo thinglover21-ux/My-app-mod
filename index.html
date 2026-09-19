@@ -125,6 +125,13 @@
         <button class="btn-secondary" id="logoutBtn">تسجيل الخروج</button>
       </div>
       <div class="balance" id="balanceResult"></div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:20px 0;">
+<p class="sub" style="margin-bottom:10px;">جرّب تحويل نص إلى صوت:</p>
+<input type="text" id="promptInput" placeholder="اكتب النص هنا..."
+  style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.04);color:var(--text);font-family:inherit;font-size:14px;margin-bottom:10px;">
+<button class="btn-primary" id="generateBtn">توليد صوت</button>
+<div id="genResult" style="margin-top:14px;"></div>
     </div>
 
     <div id="statusBox" class="status" role="status" aria-live="polite"></div>
@@ -207,7 +214,40 @@ async function checkBalance() {
     $("balanceResult").textContent = "تعذّر جلب الرصيد: " + err.message;
   }
 }
+async function generateSpeech() {
+  const key = localStorage.getItem("pollinations_api_key");
+  const text = $("promptInput").value.trim();
+  const resultBox = $("genResult");
 
+  if (!text) {
+    resultBox.textContent = "اكتب النص أولاً.";
+    return;
+  }
+
+  resultBox.textContent = "جارِ توليد الصوت...";
+
+  try {
+    const res = await fetch(
+      `https://gen.pollinations.ai/audio/${encodeURIComponent(text)}?voice=nova`,
+      { headers: { Authorization: `Bearer ${key}` } }
+    );
+    if (!res.ok) {
+      let detail = "";
+      try { detail = JSON.stringify(await res.json()); }
+      catch { detail = await res.text(); }
+      throw new Error(`HTTP ${res.status} — ${detail}`);
+    }
+
+    const blob = await res.blob();
+    resultBox.innerHTML = "";
+    const audio = document.createElement("audio");
+    audio.controls = true;
+    audio.src = URL.createObjectURL(blob);
+    resultBox.appendChild(audio);
+  } catch (err) {
+    resultBox.textContent = "تعذّر توليد الصوت: " + err.message;
+  }
+  }
 function handleRedirectCallback() {
   if (!window.location.hash) return;
   const frag = new URLSearchParams(window.location.hash.slice(1));
@@ -251,7 +291,7 @@ function render() {
 $("loginBtn").addEventListener("click", startLogin);
 $("logoutBtn").addEventListener("click", logout);
 $("balanceBtn").addEventListener("click", checkBalance);
-
+$("generateBtn").addEventListener("click", generateSpeech);
 handleRedirectCallback();
 render();
 </script>
